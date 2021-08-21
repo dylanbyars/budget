@@ -1,0 +1,16 @@
+{
+  // This is based on https://deno.land/manual/getting_started/typescript#custom-typescript-compiler-options
+  // then the defaults are removed.
+ 
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Deno",
+ 
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2017",
+    "jsx": "react",
+    "lib": ["es2015", "deno.window"],
+    "resolveJsonModule": true,
+    "strict": true
+  }
+}
