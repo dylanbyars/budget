@@ -1,65 +1,56 @@
-// import * as stringSimilarity from 'https://deno.land/x/string_similarity/mod.ts'
-import {
-  mapValues,
-  groupBy,
-} from 'https://deno.land/std@0.105.0/collections/mod.ts'
-import { readCSVObjects } from 'https://deno.land/x/csv/mod.ts'
-
-const COMMON_STORES = [
-  'Amazon',
-  'Paypal',
-  'Wegmans',
-  'Whole Foods',
-  'Harris Teeter',
-]
+import { mapEntries } from 'https://deno.land/std@0.106.0/collections/map_entries.ts'
+import AsciiTable, {
+  AsciiAlign,
+} from 'https://deno.land/x/ascii_table@v0.1.0/mod.ts'
+import titleCase from 'https://deno.land/x/case@v2.1.0/titleCase.ts'
+import pullData from './src/parser.ts'
+import type { Transaction } from './src/parser.ts'
 
 function formatAsCurrency(number: number) {
   const fixedNumber = Math.abs(number).toFixed(2)
   return `${number < 0 ? '-' : ''}$${fixedNumber}`
 }
 
-const files = Deno.args
+;(async function () {
+  const files = Deno.args
 
-const totalsByCategory: Record<string, number> = {}
-const totalsByDescription: Record<string, number> = {}
+  const grouped = await pullData(files[0])
 
-const descriptions = new Set()
+  for (const [category, transactions] of Object.entries(grouped)) {
+    const headers: (keyof Transaction)[] = [
+      'transactionDate',
+      'description',
+      'debit',
+      'credit',
+    ]
 
-type Row = {
-  'Transaction Date': string
-  'Posted Date': string
-  'Card No.': string
-  Description: string
-  Category: string
-  Debit: string
-  Credit: string
-}
+    const table = new AsciiTable().setHeading(headers.map((h) => titleCase(h)))
 
-async function pullData(pathToFile: string) {
-  const file = await Deno.open(pathToFile)
-
-  const content: any = []
-
-  for await (const row of readCSVObjects(file)) {
-    const { Category, Credit, Debit, Description } = row as Row
-    const [credit, debit] = [Credit, Debit].map((n) => (n ? parseFloat(n) : 0))
-    totalsByCategory[Category] =
-      debit - credit + (totalsByCategory[Category] || 0)
-    totalsByDescription[Description] =
-      debit - credit + (totalsByDescription[Description] || 0)
-
-    content.push(row)
-
-    descriptions.add(Description)
+    let categoryTotal: number = 0
+    transactions.forEach(({ transactionDate, description, debit, credit }) => {
+      table.addRow(
+        transactionDate,
+        description,
+        formatAsCurrency(debit),
+        formatAsCurrency(credit)
+      )
+      categoryTotal += debit - credit
+    })
+    table.setTitle(`${category} ${formatAsCurrency(categoryTotal)}`)
+    // table.setTitle(category)
+    console.log(table.toString())
   }
+  // const table = new AsciiTable('test')
 
-  file.close()
-
-  return content
-}
-
-const c = await pullData(files[0])
-
-const grouped = groupBy<Row>(c, (row) => row.Category)
-console.log(grouped)
-console.log(mapValues(totalsByCategory, formatAsCurrency))
+  // console.log(
+  //   table
+  //     .setHeading('alpha', 'beta', 'gamma')
+  //     .addRow('aaa', 'bbb', 'cccc')
+  //     .addRow('aaa', 'bbb', 'cccc')
+  //     .addRow('aaa', 'bbb', 'cccc')
+  //     .addRow('aaa', 'bbb', 'cccc')
+  //     .addRow('aaa', 'bbb', 'cccc')
+  //     .addRow('aaa', 'bbb', 'cccc')
+  //     .toString()
+  // )
+})()
